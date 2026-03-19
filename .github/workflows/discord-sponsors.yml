@@ -1,8 +1,28 @@
 name: Discord Sponsor Notifications
 
 on:
-  sponsorship:
-    types: [created, cancelled, tier_changed, pending_cancellation]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Sponsor event type'
+        required: true
+        default: 'created'
+        type: choice
+        options:
+          - created
+          - cancelled
+          - tier_changed
+      sponsor:
+        description: 'Sponsor GitHub username'
+        required: true
+      tier:
+        description: 'Tier name'
+        required: false
+        default: 'Sponsor'
+      amount:
+        description: 'Monthly amount ($)'
+        required: false
+        default: '5'
 
 jobs:
   notify:
@@ -12,23 +32,17 @@ jobs:
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_SPONSORS_WEBHOOK }}
         run: |
-          ACTION="${{ github.event.action }}"
-          SPONSOR="${{ github.event.sponsorship.sponsor.login }}"
+          ACTION="${{ inputs.action }}"
+          SPONSOR="${{ inputs.sponsor }}"
+          TIER="${{ inputs.tier }}"
+          MONTHLY="${{ inputs.amount }}"
           SPONSOR_URL="https://github.com/$SPONSOR"
-          SPONSOR_AVATAR="${{ github.event.sponsorship.sponsor.avatar_url }}"
-          TIER="${{ github.event.sponsorship.tier.name }}"
-          MONTHLY="${{ github.event.sponsorship.tier.monthly_price_in_dollars }}"
-          IS_ONETIME="${{ github.event.sponsorship.tier.is_one_time }}"
 
           if [ "$ACTION" = "created" ]; then
             TITLE="New Sponsor"
             EMOJI="🎉"
             COLOR=3066993
-            if [ "$IS_ONETIME" = "true" ]; then
-              DESC="**${SPONSOR}** made a one-time sponsorship!\n\nTier: **${TIER}** (\$${MONTHLY})"
-            else
-              DESC="**${SPONSOR}** is now sponsoring!\n\nTier: **${TIER}** (\$${MONTHLY}/month)"
-            fi
+            DESC="**${SPONSOR}** is now sponsoring!\n\nTier: **${TIER}** (\$${MONTHLY}/month)\n\n👉 Assign the Sponsor role in Discord"
           elif [ "$ACTION" = "cancelled" ]; then
             TITLE="Sponsor Cancelled"
             EMOJI="😢"
@@ -39,11 +53,6 @@ jobs:
             EMOJI="🔄"
             COLOR=3447003
             DESC="**${SPONSOR}** changed their tier.\n\nNew tier: **${TIER}** (\$${MONTHLY}/month)"
-          elif [ "$ACTION" = "pending_cancellation" ]; then
-            TITLE="Sponsor Pending Cancellation"
-            EMOJI="⏳"
-            COLOR=16776960
-            DESC="**${SPONSOR}** has scheduled cancellation at the end of their billing period.\n\nCurrent tier: **${TIER}**"
           else
             TITLE="Sponsor Event"
             EMOJI="📢"
@@ -55,17 +64,15 @@ jobs:
             --arg title "${EMOJI} ${TITLE}" \
             --arg desc "$DESC" \
             --arg url "$SPONSOR_URL" \
-            --arg avatar "$SPONSOR_AVATAR" \
             --arg sponsor "$SPONSOR" \
-            --arg footer "GitHub Sponsors • wolfstack" \
+            --arg footer "GitHub Sponsors • WolfStack" \
             '{
               embeds: [{
                 title: $title,
                 description: $desc,
                 url: $url,
                 color: '$COLOR',
-                thumbnail: { url: $avatar },
-                author: { name: $sponsor, url: $url, icon_url: $avatar },
+                author: { name: $sponsor, url: $url },
                 footer: { text: $footer },
                 timestamp: (now | todate)
               }]
